@@ -1,0 +1,241 @@
+// Every read and write the screens make, as TanStack Query hooks. Writes
+// refresh what they affect, so screens never patch data by hand.
+
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+
+import { api, apiPage } from "./client";
+import type { FuelLogDto, FuelSummaryDto, HomeDto, SettingsDto, ShareDto, TripDto } from "./dto";
+import { toFuelLog, toFuelSummary, toHome, toSettings, toSharePage, toTrip } from "./mappers";
+import type { FuelType, Leg, Rates, TripStatus } from "../types";
+
+export const keys = {
+  home: ["home"] as const,
+  settings: ["settings"] as const,
+  trips: ["trips"] as const,
+  tripList: (status: TripStatus | null) => ["trips", "list", status] as const,
+  trip: (id: string) => ["trips", "one", id] as const,
+  fuel: ["fuel"] as const,
+  fuelSummary: (months: number) => ["fuel", "summary", months] as const,
+  share: (token: string) => ["share", token] as const,
+};
+
+export const TRIPS_PAGE_SIZE = 30;
+
+export function useHome() {
+  return useQuery({ queryKey: keys.home, queryFn: async () => toHome(await api<HomeDto>("/home")) });
+}
+
+export function useSettings() {
+  return useQuery({
+    queryKey: keys.settings,
+    queryFn: async () => toSettings(await api<SettingsDto>("/settings")),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useTripList(status: TripStatus | null) {
+  return useInfiniteQuery({
+    queryKey: keys.tripList(status),
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const query = new URLSearchParams({ page: String(pageParam), page_size: String(TRIPS_PAGE_SIZE) });
+      if (status) query.set("status", status);
+      const page = await apiPage<TripDto>(`/trips?${query}`);
+      return { trips: page.data.map(toTrip), total: page.meta.total, page: page.meta.page };
+    },
+    getNextPageParam: (last) => (last.page * TRIPS_PAGE_SIZE < last.total ? last.page + 1 : undefined),
+  });
+}
+
+export function useTrip(id: string) {
+  return useQuery({ queryKey: keys.trip(id), queryFn: async () => toTrip(await api<TripDto>(`/trips/${id}`)) });
+}
+
+export function useFuelSummary(months: number) {
+  return useQuery({
+    queryKey: keys.fuelSummary(months),
+    queryFn: async () => toFuelSummary(await api<FuelSummaryDto>(`/fuel/summary?months=${months}`)),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useSharePage(token: string) {
+  return useQuery({
+    queryKey: keys.share(token),
+    queryFn: async () => toSharePage(await api<ShareDto>(`/share/${token}`, { anonymous: true })),
+    retry: (count, error) => count < 2 && !(error instanceof Error && "status" in error && error.status === 404),
+  });
+}
+
+/** Anything about trips changed: home, lists, details and the fuel comparison. */
+function tripsChanged(client: QueryClient) {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: keys.home }),
+    client.invalidateQueries({ queryKey: keys.trips }),
+    client.invalidateQueries({ queryKey: keys.fuel }),
+  ]);
+}
+
+export type LendInput = {
+  startDate: string;
+  startKm: number;
+  /** Registers a trip that already came back. */
+  return?: ReturnInput;
+};
+
+export type ReturnInput = { returnDate: string; endKm: number; fuelType: FuelType };
+
+const returnBody = (r: ReturnInput) => ({ return_date: r.returnDate, end_km: r.endKm, fuel_type: r.fuelType });
+
+export function useLend() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: LendInput) =>
+      toTrip(
+        await api<TripDto>("/trips", {
+          method: "POST",
+          body: {
+            start_date: input.startDate,
+            start_km: input.startKm,
+            return: input.return ? returnBody(input.return) : undefined,
+          },
+        }),
+      ),
+    onSuccess: () => tripsChanged(client),
+  });
+}
+
+export function useReceive() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ tripId, ...input }: ReturnInput & { tripId: string }) =>
+      toTrip(await api<TripDto>(`/trips/${tripId}/return`, { method: "POST", body: returnBody(input) })),
+    onSuccess: () => tripsChanged(client),
+  });
+}
+
+/** cancel, pay and unpay: one trip, one action. */
+export function useTripAction(action: "cancel" | "pay" | "unpay") {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (tripId: string) => toTrip(await api<TripDto>(`/trips/${tripId}/${action}`, { method: "POST" })),
+    onSuccess: () => tripsChanged(client),
+  });
+}
+
+export function usePayMany() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (tripIds: string[]) =>
+      api<{ trip_ids: string[]; summary: { count: number; total_amount: string } }>("/trips/pay", {
+        method: "POST",
+        body: { trip_ids: tripIds },
+      }),
+    onSuccess: () => tripsChanged(client),
+  });
+}
+
+export function useDeleteTrip() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (tripId: string) => api<void>(`/trips/${tripId}`, { method: "DELETE" }),
+    onSuccess: (_, tripId) => {
+      client.removeQueries({ queryKey: keys.trip(tripId) });
+      return tripsChanged(client);
+    },
+  });
+}
+
+/** Uploads a leg's photo; returns the trip with its new signed URL. */
+export function uploadPhoto(tripId: string, leg: Leg, photo: Blob) {
+  return api<TripDto>(`/trips/${tripId}/photos/${leg}`, { method: "PUT", blob: photo }).then(toTrip);
+}
+
+export function useSetPhoto() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tripId, leg, photo }: { tripId: string; leg: Leg; photo: Blob }) => uploadPhoto(tripId, leg, photo),
+    onSuccess: (trip) => {
+      client.setQueryData(keys.trip(trip.id), trip);
+      return tripsChanged(client);
+    },
+  });
+}
+
+export function useDeletePhoto() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ tripId, leg }: { tripId: string; leg: Leg }) =>
+      toTrip(await api<TripDto>(`/trips/${tripId}/photos/${leg}`, { method: "DELETE" })),
+    onSuccess: (trip) => {
+      client.setQueryData(keys.trip(trip.id), trip);
+      return tripsChanged(client);
+    },
+  });
+}
+
+export type FuelLogInput = { date: string; odometer: number; fuelType: FuelType; amount: number; isFull: boolean };
+
+export function useAddFuelLog() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: FuelLogInput) =>
+      toFuelLog(
+        await api<FuelLogDto>("/fuel-logs", {
+          method: "POST",
+          body: {
+            date: input.date,
+            odometer: input.odometer,
+            fuel_type: input.fuelType,
+            amount: input.amount.toFixed(2),
+            is_full: input.isFull,
+          },
+        }),
+      ),
+    onSuccess: () =>
+      Promise.all([client.invalidateQueries({ queryKey: keys.fuel }), client.invalidateQueries({ queryKey: keys.home })]),
+  });
+}
+
+export function useDeleteFuelLog() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/fuel-logs/${id}`, { method: "DELETE" }),
+    onSuccess: () =>
+      Promise.all([client.invalidateQueries({ queryKey: keys.fuel }), client.invalidateQueries({ queryKey: keys.home })]),
+  });
+}
+
+function useSettingsMutation<T>(fn: (input: T) => Promise<SettingsDto>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: T) => toSettings(await fn(input)),
+    onSuccess: (settings) => client.setQueryData(keys.settings, settings),
+  });
+}
+
+export function useUpdateRates() {
+  return useSettingsMutation((rates: Rates) =>
+    api<SettingsDto>("/settings/rates", {
+      method: "PUT",
+      body: {
+        gasoline_rate: String(rates.gasolineRate),
+        lpg_rate: String(rates.lpgRate),
+        wear_rate: String(rates.wearRate),
+      },
+    }),
+  );
+}
+
+export function useUpdateProfile() {
+  return useSettingsMutation((input: { carName: string; borrowerName: string }) =>
+    api<SettingsDto>("/settings/profile", {
+      method: "PUT",
+      body: { car_name: input.carName, borrower_name: input.borrowerName },
+    }),
+  );
+}
+
+export function useRotateShareToken() {
+  return useSettingsMutation(() => api<SettingsDto>("/settings/share-token", { method: "POST" }));
+}
