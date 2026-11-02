@@ -1,0 +1,27 @@
+# Production stack of the web. GitHub Actions copies it to /opt/km-web on each
+# deploy; it is not edited by hand on the server.
+#
+# It never builds: the image is compiled once in CI and published to GHCR.
+# The web is static and has no configuration or secrets, so there is no .env here.
+# The HEALTHCHECK comes with the image (Dockerfile) and asks for /healthz.
+
+networks:
+  shared:
+    name: atm-network
+    external: true
+
+services:
+  app:
+    image: ghcr.io/atmosferasoltec/atm-km-web:${IMAGE_TAG:-latest}
+    container_name: km-web
+    # Loopback only: the host nginx (km.atmosferast.com) is what publishes it.
+    ports:
+      - '127.0.0.1:3150:8080'
+    networks:
+      - shared
+    restart: unless-stopped
+    security_opt: ['no-new-privileges:true']
+    deploy:
+      resources:
+        limits:
+          memory: 128m
