@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { KmMark } from "../components/km-mark";
 import { Receipt, StatusBadge, TripIcon, tripReceipt, tripSummary } from "../components/trip-bits";
 import { TripLegsView } from "../components/trip-legs-view";
+import { VoucherCard } from "../components/vouchers";
 import { PageLoader } from "../components/states";
 import { Card, Chips } from "../components/ui";
 import { ApiError } from "../lib/api/client";
@@ -14,7 +15,7 @@ import { formatRange } from "../lib/dates";
 import { cn, money, plural } from "../lib/format";
 import type { Trip } from "../lib/types";
 
-type Tab = "pending" | "history";
+type Tab = "pending" | "vouchers" | "history";
 
 /** What the borrower sees from the shared link, with no login. */
 export function SharePage() {
@@ -40,6 +41,8 @@ export function SharePage() {
 
   const profile = page.data;
   const pending = profile.pending.trips;
+  const vouchers = profile.pending.vouchers;
+  const { balance, totalAmount, voucherAmount } = profile.pending;
   const list = tab === "pending" ? pending : profile.history;
 
   return (
@@ -55,9 +58,10 @@ export function SharePage() {
       <div className="relative overflow-hidden rounded-3xl bg-zinc-900 p-6 text-white">
         <div className="bg-brand absolute -top-20 -right-10 size-48 rounded-full opacity-25 blur-3xl" />
         <p className="relative text-sm text-zinc-400">Hola {profile.borrowerName}, tienes pendiente</p>
-        <p className="text-brand relative text-5xl font-bold tracking-tight tabular-nums">{money(profile.pending.totalAmount)}</p>
+        <p className="text-brand relative text-5xl font-bold tracking-tight tabular-nums">{money(Math.max(balance, 0))}</p>
         <p className="relative mt-1 text-sm text-zinc-400">
           {pending.length > 0 ? `${plural(pending.length, "viaje", "viajes")} por pagar` : "Estás al día 🙌"}
+          {vouchers.length > 0 && ` · ya descontados ${money(voucherAmount)} de combustible (de ${money(totalAmount)})`}
         </p>
       </div>
 
@@ -66,11 +70,20 @@ export function SharePage() {
         onChange={setTab}
         options={[
           { value: "pending", label: "Por pagar" },
+          ...(vouchers.length > 0 ? [{ value: "vouchers" as const, label: `Vouchers · ${vouchers.length}` }] : []),
           { value: "history", label: "Historial" },
         ]}
       />
 
-      <div className="flex flex-col gap-2">
+      {tab === "vouchers" && (
+        <div className="grid grid-cols-2 gap-2">
+          {vouchers.map((voucher) => (
+            <VoucherCard key={voucher.id} voucher={voucher} />
+          ))}
+        </div>
+      )}
+
+      <div className={cn("flex flex-col gap-2", tab === "vouchers" && "hidden")}>
         {list.length === 0 && <Card className="p-8 text-center text-sm text-zinc-500">No hay nada por aquí.</Card>}
         {list.map((trip) => (
           <SharedTrip key={trip.id} trip={trip} />

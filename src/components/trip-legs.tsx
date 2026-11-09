@@ -180,7 +180,7 @@ export function LegDateInput({
 }
 
 /** A saved leg's photo: its thumbnail opens the viewer. Read-only. */
-export function LegPhoto({ photo }: { photo: Photo | null }) {
+export function LegPhoto({ photo, alt = "Foto del odómetro" }: { photo: Photo | null; alt?: string }) {
   const [viewing, setViewing] = useState(false);
   if (!photo) {
     return (
@@ -192,14 +192,22 @@ export function LegPhoto({ photo }: { photo: Photo | null }) {
   }
   return (
     <>
-      <PhotoThumb url={photo.url} onClick={() => setViewing(true)} />
-      <PhotoViewer photo={photo} open={viewing} onClose={() => setViewing(false)} />
+      <PhotoThumb url={photo.url} alt={alt} onClick={() => setViewing(true)} />
+      <PhotoViewer photo={photo} alt={alt} open={viewing} onClose={() => setViewing(false)} />
     </>
   );
 }
 
 /** Picks a photo in a form, before the trip exists: it uploads on save. */
-export function LegPhotoInput({ value, onChange }: { value: Blob | null; onChange: (photo: Blob | null) => void }) {
+export function LegPhotoInput({
+  value,
+  onChange,
+  alt = "Foto del odómetro",
+}: {
+  value: Blob | null;
+  onChange: (photo: Blob | null) => void;
+  alt?: string;
+}) {
   const preview = useObjectUrl(value);
   const [busy, setBusy] = useState(false);
   return (
@@ -216,7 +224,7 @@ export function LegPhotoInput({ value, onChange }: { value: Blob | null; onChang
         }}
       >
         {preview ? (
-          <img src={preview} alt="Foto del odómetro" className="absolute inset-0 size-full rounded-2xl object-cover" />
+          <img src={preview} alt={alt} className="absolute inset-0 size-full rounded-2xl object-cover" />
         ) : (
           <>
             <Camera className="size-5" />
@@ -266,8 +274,8 @@ export function LegPhotoEditor({ tripId, leg, photo }: { tripId: string; leg: Le
 
   return (
     <>
-      <PhotoThumb url={photo.url} onClick={() => setViewing(true)} />
-      <PhotoViewer photo={photo} open={viewing} onClose={() => setViewing(false)}>
+      <PhotoThumb url={photo.url} alt="Foto del odómetro" onClick={() => setViewing(true)} />
+      <PhotoViewer photo={photo} alt="Foto del odómetro" open={viewing} onClose={() => setViewing(false)}>
         <div className="grid grid-cols-2 gap-2">
           <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/10 text-sm font-semibold text-white">
             <Camera className="size-4" /> {setPhoto.isPending ? "Subiendo…" : "Cambiar"}
@@ -308,7 +316,7 @@ export function LegPhotoEditor({ tripId, leg, photo }: { tripId: string; leg: Le
 const TILE =
   "relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition";
 
-function PhotoThumb({ url, onClick }: { url: string; onClick: () => void }) {
+function PhotoThumb({ url, alt, onClick }: { url: string; alt: string; onClick: () => void }) {
   const [failed, setFailed] = useState(false);
   return (
     <button
@@ -323,7 +331,7 @@ function PhotoThumb({ url, onClick }: { url: string; onClick: () => void }) {
           <span>No cargó</span>
         </>
       ) : (
-        <img src={url} alt="Foto del odómetro" loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
+        <img src={url} alt={alt} loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 size-full object-cover" />
       )}
     </button>
   );
@@ -365,11 +373,13 @@ function PhotoFileButton({ busy, onPick, children }: { busy: boolean; onPick: (f
 /** Full-screen photo, with when it was taken and when it gets deleted. */
 function PhotoViewer({
   photo,
+  alt,
   open,
   onClose,
   children,
 }: {
   photo: Photo;
+  alt: string;
   open: boolean;
   onClose: () => void;
   children?: ReactNode;
@@ -390,7 +400,7 @@ function PhotoViewer({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Foto del odómetro"
+      aria-label={alt}
       className="animate-fade fixed inset-0 z-50 flex flex-col bg-black/95 pt-[env(safe-area-inset-top)] pb-[calc(1rem+env(safe-area-inset-bottom))]"
     >
       <div className="flex items-center justify-between px-4 py-3 text-white">
@@ -403,7 +413,7 @@ function PhotoViewer({
         </button>
       </div>
       <div className="flex min-h-0 flex-1 items-center justify-center px-2" onClick={onClose}>
-        <img src={photo.url} alt="Foto del odómetro" className="max-h-full max-w-full rounded-xl object-contain" />
+        <img src={photo.url} alt={alt} className="max-h-full max-w-full rounded-xl object-contain" />
       </div>
       {children && <div className="mx-auto w-full max-w-lg px-4 pt-3">{children}</div>}
     </div>

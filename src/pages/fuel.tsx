@@ -104,6 +104,7 @@ export function FuelPage() {
                       </p>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
                         {formatRelative(log.date)} · {km(log.odometer)}
+                        {log.pricePerGallon !== null && ` · ${money(log.pricePerGallon)}/gal`}
                       </p>
                     </div>
                     <span className="text-sm font-bold tabular-nums">{money(log.amount)}</span>
@@ -195,9 +196,11 @@ function FuelForm({ lastFuel, lastOdometer, onDone }: { lastFuel: FuelType; last
   const [date, setDate] = useState(today());
   const [choice, setChoice] = useState("");
   const [fullAmount, setFullAmount] = useState("");
+  const [pricePerGallon, setPricePerGallon] = useState("");
 
   const isFull = choice === "FULL";
   const amount = Number(isFull ? fullAmount : choice);
+  const price = Number(pricePerGallon);
   const canSave = amount > 0 && Number(odometer) > 0 && !addLog.isPending;
 
   return (
@@ -245,6 +248,18 @@ function FuelForm({ lastFuel, lastOdometer, onDone }: { lastFuel: FuelType; last
         <OdometerInput value={odometer} onChange={setOdometer} />
       </Field>
 
+      <Field label="Precio por galón (opcional)">
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0"
+          placeholder="Ej. 5.80"
+          value={pricePerGallon}
+          onChange={(e) => setPricePerGallon(e.target.value)}
+        />
+      </Field>
+
       <Field label="Fecha">
         <Input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
       </Field>
@@ -255,7 +270,7 @@ function FuelForm({ lastFuel, lastOdometer, onDone }: { lastFuel: FuelType; last
         disabled={!canSave}
         onClick={async () => {
           try {
-            await addLog.mutateAsync({ date, odometer: Number(odometer), fuelType, amount, isFull });
+            await addLog.mutateAsync({ date, odometer: Number(odometer), fuelType, amount, isFull, pricePerGallon: price > 0 ? price : undefined });
             notify(`Carga de ${money(amount)} registrada`);
             onDone();
           } catch (err) {

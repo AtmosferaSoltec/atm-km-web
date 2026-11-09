@@ -30,7 +30,23 @@ export type SettingsDto = {
   share_token: string;
 };
 
-export type PendingDto = { count: number; total_amount: string; trips: TripDto[] };
+export type VoucherDto = {
+  id: string;
+  date: string;
+  amount: string;
+  settled_date: string | null;
+  photo: PhotoDto | null;
+  created_at: string;
+};
+
+export type PendingDto = {
+  count: number;
+  total_amount: string;
+  trips: TripDto[];
+  vouchers: VoucherDto[];
+  voucher_amount: string;
+  balance: string;
+};
 
 export type HomeDto = {
   open_trip: TripDto | null;
@@ -48,6 +64,7 @@ export type FuelLogDto = {
   fuel_type: FuelType;
   amount: string;
   is_full: boolean;
+  price_per_gallon: string | null;
   created_at: string;
 };
 
@@ -55,6 +72,13 @@ export type FuelSummaryDto = {
   months: { month: string; spent: string; charged: string; logs: FuelLogDto[] }[];
   real_cost_per_km: string | null;
   has_more: boolean;
+};
+
+export type UsageDto = {
+  weeks: { start: string; owner_km: number; borrower_km: number }[];
+  owner_km: number;
+  borrower_km: number;
+  owner_share_pct: number;
 };
 
 export type ShareDto = {

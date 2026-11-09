@@ -2,8 +2,8 @@
 // display: the API already did the math, with decimals, and is the source of truth.
 
 import { apiUrl } from "./client";
-import type { FuelLogDto, FuelSummaryDto, HomeDto, PendingDto, PhotoDto, SettingsDto, ShareDto, TripDto } from "./dto";
-import type { FuelLog, FuelMonth, FuelSummary, Home, Pending, Photo, Settings, SharePage, Trip } from "../types";
+import type { FuelLogDto, FuelSummaryDto, HomeDto, PendingDto, PhotoDto, SettingsDto, ShareDto, TripDto, UsageDto, VoucherDto } from "./dto";
+import type { FuelLog, FuelMonth, FuelSummary, Home, Pending, Photo, Settings, SharePage, Trip, Usage, Voucher } from "../types";
 
 const amount = (value: string | null) => (value == null ? null : Number(value));
 
@@ -44,8 +44,19 @@ export function toSettings(dto: SettingsDto): Settings {
   };
 }
 
+export function toVoucher(dto: VoucherDto): Voucher {
+  return { id: dto.id, date: dto.date, amount: Number(dto.amount), photo: toPhoto(dto.photo) };
+}
+
 function toPending(dto: PendingDto): Pending {
-  return { count: dto.count, totalAmount: Number(dto.total_amount), trips: dto.trips.map(toTrip) };
+  return {
+    count: dto.count,
+    totalAmount: Number(dto.total_amount),
+    trips: dto.trips.map(toTrip),
+    vouchers: dto.vouchers.map(toVoucher),
+    voucherAmount: Number(dto.voucher_amount),
+    balance: Number(dto.balance),
+  };
 }
 
 export function toHome(dto: HomeDto): Home {
@@ -72,6 +83,7 @@ export function toFuelLog(dto: FuelLogDto): FuelLog {
     fuelType: dto.fuel_type,
     amount: Number(dto.amount),
     isFull: dto.is_full,
+    pricePerGallon: amount(dto.price_per_gallon),
   };
 }
 
@@ -82,6 +94,15 @@ export function toFuelSummary(dto: FuelSummaryDto): FuelSummary {
     ),
     realCostPerKm: amount(dto.real_cost_per_km),
     hasMore: dto.has_more,
+  };
+}
+
+export function toUsage(dto: UsageDto): Usage {
+  return {
+    weeks: dto.weeks.map((w) => ({ start: w.start, ownerKm: w.owner_km, borrowerKm: w.borrower_km })),
+    ownerKm: dto.owner_km,
+    borrowerKm: dto.borrower_km,
+    ownerSharePct: dto.owner_share_pct,
   };
 }
 

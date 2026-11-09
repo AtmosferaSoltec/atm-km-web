@@ -47,6 +47,8 @@ export type FuelLog = {
   amount: number;
   /** "Fill it up": the amount is set by the pump, so it is rarely round. */
   isFull: boolean;
+  /** What the station charged per gallon, if noted. */
+  pricePerGallon: number | null;
 };
 
 export type Settings = {
@@ -62,10 +64,23 @@ export type User = {
   displayName: string;
 };
 
+/** Fuel the borrower paid for while using the car. Until it is settled it lowers what he owes. */
+export type Voucher = {
+  id: string;
+  date: string;
+  amount: number;
+  photo: Photo | null;
+};
+
 export type Pending = {
   count: number;
   totalAmount: number;
   trips: Trip[];
+  /** Vouchers not yet discounted from a payment. */
+  vouchers: Voucher[];
+  voucherAmount: number;
+  /** What is left to pay: trips minus vouchers. Negative if the vouchers exceed the trips. */
+  balance: number;
 };
 
 export type Home = {
@@ -89,6 +104,16 @@ export type FuelSummary = {
   months: FuelMonth[];
   realCostPerKm: number | null;
   hasMore: boolean;
+};
+
+export type WeekUsage = { start: string; ownerKm: number; borrowerKm: number };
+
+/** Who drove the car: the owner (odometer movement while it was home) vs. the borrower (trips). */
+export type Usage = {
+  weeks: WeekUsage[];
+  ownerKm: number;
+  borrowerKm: number;
+  ownerSharePct: number;
 };
 
 export type SharePage = {

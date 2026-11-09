@@ -4,8 +4,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { api, apiPage } from "./client";
-import type { FuelLogDto, FuelSummaryDto, HomeDto, SettingsDto, ShareDto, TripDto } from "./dto";
-import { toFuelLog, toFuelSummary, toHome, toSettings, toSharePage, toTrip } from "./mappers";
+import type { FuelLogDto, FuelSummaryDto, HomeDto, SettingsDto, ShareDto, TripDto, UsageDto, VoucherDto } from "./dto";
+import { toFuelLog, toFuelSummary, toHome, toSettings, toSharePage, toTrip, toUsage, toVoucher } from "./mappers";
 import type { FuelType, Leg, Rates, TripStatus } from "../types";
 
 export const keys = {
@@ -16,6 +16,7 @@ export const keys = {
   trip: (id: string) => ["trips", "one", id] as const,
   fuel: ["fuel"] as const,
   fuelSummary: (months: number) => ["fuel", "summary", months] as const,
+  usage: (weeks: number) => ["usage", weeks] as const,
   share: (token: string) => ["share", token] as const,
 };
 
@@ -59,6 +60,10 @@ export function useFuelSummary(months: number) {
   });
 }
 
+export function useUsage(weeks: number) {
+  return useQuery({ queryKey: keys.usage(weeks), queryFn: async () => toUsage(await api<UsageDto>(`/usage?weeks=${weeks}`)) });
+}
+
 export function useSharePage(token: string) {
   return useQuery({
     queryKey: keys.share(token),
@@ -73,6 +78,7 @@ function tripsChanged(client: QueryClient) {
     client.invalidateQueries({ queryKey: keys.home }),
     client.invalidateQueries({ queryKey: keys.trips }),
     client.invalidateQueries({ queryKey: keys.fuel }),
+    client.invalidateQueries({ queryKey: ["usage"] }),
   ]);
 }
 
@@ -123,15 +129,51 @@ export function useTripAction(action: "cancel" | "pay" | "unpay") {
   });
 }
 
+export type PayInput = { tripIds: string[]; voucherIds: string[] };
+
+export type PayResult = {
+  trip_ids: string[];
+  voucher_ids: string[];
+  summary: { count: number; total_amount: string; voucher_count: number; voucher_amount: string; net_amount: string };
+};
+
+/** "Ya me pagó": the ticked trips are paid and the ticked vouchers are discounted, together. */
 export function usePayMany() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (tripIds: string[]) =>
-      api<{ trip_ids: string[]; summary: { count: number; total_amount: string } }>("/trips/pay", {
-        method: "POST",
-        body: { trip_ids: tripIds },
-      }),
+    mutationFn: ({ tripIds, voucherIds }: PayInput) =>
+      api<PayResult>("/trips/pay", { method: "POST", body: { trip_ids: tripIds, voucher_ids: voucherIds } }),
     onSuccess: () => tripsChanged(client),
+  });
+}
+
+export type VoucherInput = { date: string; amount: number; photo: Blob | null };
+
+/** Registers a voucher and, if there is one, uploads its photo. The voucher exists even if the photo fails. */
+export function useAddVoucher() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ date, amount, photo }: VoucherInput) => {
+      const voucher = toVoucher(
+        await api<VoucherDto>("/vouchers", { method: "POST", body: { date, amount: amount.toFixed(2) } }),
+      );
+      if (!photo) return { voucher, photoFailed: false };
+      try {
+        await api<VoucherDto>(`/vouchers/${voucher.id}/photo`, { method: "PUT", blob: photo });
+        return { voucher, photoFailed: false };
+      } catch {
+        return { voucher, photoFailed: true };
+      }
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.home }),
+  });
+}
+
+export function useDeleteVoucher() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (voucherId: string) => api<void>(`/vouchers/${voucherId}`, { method: "DELETE" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.home }),
   });
 }
 
@@ -174,7 +216,7 @@ export function useDeletePhoto() {
   });
 }
 
-export type FuelLogInput = { date: string; odometer: number; fuelType: FuelType; amount: number; isFull: boolean };
+export type FuelLogInput = { date: string; odometer: number; fuelType: FuelType; amount: number; isFull: boolean; pricePerGallon?: number };
 
 export function useAddFuelLog() {
   const client = useQueryClient();
@@ -189,11 +231,16 @@ export function useAddFuelLog() {
             fuel_type: input.fuelType,
             amount: input.amount.toFixed(2),
             is_full: input.isFull,
+            price_per_gallon: input.pricePerGallon?.toFixed(2) ?? null,
           },
         }),
       ),
     onSuccess: () =>
-      Promise.all([client.invalidateQueries({ queryKey: keys.fuel }), client.invalidateQueries({ queryKey: keys.home })]),
+      Promise.all([
+        client.invalidateQueries({ queryKey: keys.fuel }),
+        client.invalidateQueries({ queryKey: keys.home }),
+        client.invalidateQueries({ queryKey: ["usage"] }),
+      ]),
   });
 }
 

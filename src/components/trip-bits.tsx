@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { ChevronRight, Flame, Fuel } from "lucide-react";
+import { Check, ChevronRight, Flame, Fuel } from "lucide-react";
 
 import { FUEL_LABELS, type Billing } from "../lib/billing";
 import { formatRange } from "../lib/dates";
@@ -53,6 +53,33 @@ export function TripRow({ trip }: { trip: Trip }) {
       </div>
       <ChevronRight className="size-4 shrink-0 text-zinc-300 dark:text-zinc-600" />
     </Link>
+  );
+}
+
+/** A trip row that is ticked instead of opened: used to pick which trips were paid. */
+export function SelectableTripRow({ trip, selected, onToggle }: { trip: Trip; selected: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={selected}
+      onClick={onToggle}
+      className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition active:bg-zinc-100 dark:active:bg-zinc-800/50"
+    >
+      <span
+        className={cn(
+          "grid size-6 shrink-0 place-items-center rounded-lg ring-2 transition",
+          selected ? "bg-brand text-ink ring-transparent" : "bg-white ring-zinc-300 dark:bg-zinc-900 dark:ring-zinc-700",
+        )}
+      >
+        {selected && <Check className="size-4" strokeWidth={3} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{formatRange(trip.startDate, trip.returnDate)}</p>
+        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{tripSummary(trip)}</p>
+      </div>
+      <span className="text-sm font-bold tabular-nums">{trip.totalAmount != null ? money(trip.totalAmount) : "—"}</span>
+    </button>
   );
 }
 
