@@ -65,6 +65,7 @@ export type FuelLogDto = {
   amount: string;
   is_full: boolean;
   price_per_gallon: string | null;
+  photo: PhotoDto | null;
   created_at: string;
 };
 

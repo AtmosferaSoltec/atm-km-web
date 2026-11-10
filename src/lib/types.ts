@@ -49,6 +49,8 @@ export type FuelLog = {
   isFull: boolean;
   /** What the station charged per gallon, if noted. */
   pricePerGallon: number | null;
+  /** Photo of the pump receipt, if one was added (and not yet deleted). */
+  photo: Photo | null;
 };
 
 export type Settings = {

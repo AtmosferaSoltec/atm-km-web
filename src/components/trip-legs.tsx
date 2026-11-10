@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight, Camera, Check, ImageOff, Loader2, Trash2, X } from "lucide-react";
 
+import { DatePicker } from "./date-picker";
 import { errorMessage } from "../lib/api/errors";
 import { useDeletePhoto, useSetPhoto } from "../lib/api/queries";
-import { formatShort, formatWeekday, localDay, today } from "../lib/dates";
+import { formatShort, formatWeekday, localDay } from "../lib/dates";
 import { cn, num } from "../lib/format";
 import { compressPhoto } from "../lib/photos";
 import { useNotify } from "../lib/toast";
@@ -164,19 +165,7 @@ export function LegDateInput({
   onChange: (value: string) => void;
   min?: string;
 }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <FieldLabel>Fecha</FieldLabel>
-      <input
-        type="date"
-        value={value}
-        min={min}
-        max={today()}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full min-w-0 rounded-2xl bg-zinc-100 px-3 text-sm font-semibold ring-teal outline-none focus:ring-2 dark:bg-zinc-800 dark:[color-scheme:dark]"
-      />
-    </label>
-  );
+  return <DatePicker compact value={value} onChange={onChange} min={min} />;
 }
 
 /** A saved leg's photo: its thumbnail opens the viewer. Read-only. */
@@ -316,7 +305,7 @@ export function LegPhotoEditor({ tripId, leg, photo }: { tripId: string; leg: Le
 const TILE =
   "relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition";
 
-function PhotoThumb({ url, alt, onClick }: { url: string; alt: string; onClick: () => void }) {
+export function PhotoThumb({ url, alt, onClick }: { url: string; alt: string; onClick: () => void }) {
   const [failed, setFailed] = useState(false);
   return (
     <button
@@ -337,7 +326,7 @@ function PhotoThumb({ url, alt, onClick }: { url: string; alt: string; onClick: 
   );
 }
 
-function PhotoFileButton({ busy, onPick, children }: { busy: boolean; onPick: (file: File) => void; children: ReactNode }) {
+export function PhotoFileButton({ busy, onPick, children }: { busy: boolean; onPick: (file: File) => void; children: ReactNode }) {
   return (
     <label
       className={cn(
@@ -371,7 +360,7 @@ function PhotoFileButton({ busy, onPick, children }: { busy: boolean; onPick: (f
 }
 
 /** Full-screen photo, with when it was taken and when it gets deleted. */
-function PhotoViewer({
+export function PhotoViewer({
   photo,
   alt,
   open,

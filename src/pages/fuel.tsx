@@ -1,16 +1,28 @@
 import { useState } from "react";
-import { Flame, Fuel, Plus, Trash2 } from "lucide-react";
+import { Camera, Flame, Fuel, Plus, Receipt, Trash2 } from "lucide-react";
 
 import { PageTitle } from "../components/app-shell";
+import { DatePicker } from "../components/date-picker";
 import { ErrorState, PageLoader, Spinner } from "../components/states";
+import { PhotoFileButton, PhotoThumb, PhotoViewer, LegPhotoInput } from "../components/trip-legs";
 import { Button, Card, Field, Input, OdometerInput, Segmented, Sheet } from "../components/ui";
 import { errorMessage } from "../lib/api/errors";
-import { useAddFuelLog, useDeleteFuelLog, useFuelSummary, useHome, useSettings } from "../lib/api/queries";
+import {
+  useAddFuelLog,
+  useDeleteFuelLog,
+  useDeleteFuelPhoto,
+  useFuelSummary,
+  useHome,
+  useSetFuelPhoto,
+  useSettings,
+  useUpdateFuelLog,
+} from "../lib/api/queries";
 import { FUEL_LABELS } from "../lib/billing";
 import { formatMonth, formatRelative, today } from "../lib/dates";
 import { cn, km, money } from "../lib/format";
+import { compressPhoto } from "../lib/photos";
 import { useNotify } from "../lib/toast";
-import type { FuelType } from "../lib/types";
+import type { FuelLog, FuelType } from "../lib/types";
 
 /** Months shown at first, and how many more each "ver anteriores" adds. */
 const MONTHS_STEP = 6;
@@ -22,7 +34,8 @@ export function FuelPage() {
   const settings = useSettings();
   const home = useHome();
   const deleteLog = useDeleteFuelLog();
-  const [adding, setAdding] = useState(false);
+  // The sheet is for a new record (null log) or for correcting one.
+  const [sheet, setSheet] = useState<{ log: FuelLog | null } | null>(null);
 
   const error = summary.error ?? settings.error ?? home.error;
   if (error) {
@@ -40,8 +53,8 @@ export function FuelPage() {
         title="Combustible"
         subtitle="Solo lo ves tú"
         action={
-          <Button variant="brand" onClick={() => setAdding(true)}>
-            <Plus /> Carga
+          <Button variant="brand" onClick={() => setSheet({ log: null })}>
+            <Plus /> Registrar
           </Button>
         }
       />
@@ -50,7 +63,7 @@ export function FuelPage() {
 
       {summary.data.months.length === 0 && (
         <Card className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Registra tus cargas de combustible para ver cuánto te cuesta el auto por km.
+          Registra tu combustible para ver cuánto te cuesta el auto por km.
         </Card>
       )}
 
@@ -82,45 +95,53 @@ export function FuelPage() {
             {month.logs.length > 0 && (
               <Card className="divide-y divide-zinc-100 overflow-hidden dark:divide-zinc-800">
                 {month.logs.map((log) => (
-                  <div key={log.id} className="group flex items-center gap-3 px-4 py-3">
-                    <span
-                      className={cn(
-                        "grid size-10 place-items-center rounded-2xl",
-                        log.fuelType === "LPG"
-                          ? "bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400"
-                          : "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
-                      )}
-                    >
-                      {log.fuelType === "LPG" ? <Flame className="size-[18px]" /> : <Fuel className="size-[18px]" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">
-                        {FUEL_LABELS[log.fuelType]}
-                        {log.isFull && (
-                          <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-zinc-800">
-                            FULL
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {formatRelative(log.date)} · {km(log.odometer)}
-                        {log.pricePerGallon !== null && ` · ${money(log.pricePerGallon)}/gal`}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold tabular-nums">{money(log.amount)}</span>
+                  <div key={log.id} className="flex items-center transition active:bg-zinc-50 dark:active:bg-zinc-800/40">
                     <button
                       type="button"
-                      aria-label="Borrar carga"
+                      aria-label="Editar registro"
+                      onClick={() => setSheet({ log })}
+                      className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4 text-left"
+                    >
+                      <span
+                        className={cn(
+                          "grid size-10 shrink-0 place-items-center rounded-2xl",
+                          log.fuelType === "LPG"
+                            ? "bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400"
+                            : "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+                        )}
+                      >
+                        {log.fuelType === "LPG" ? <Flame className="size-[18px]" /> : <Fuel className="size-[18px]" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center text-sm font-semibold">
+                          {FUEL_LABELS[log.fuelType]}
+                          {log.isFull && (
+                            <span className="ml-2 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-zinc-800">
+                              FULL
+                            </span>
+                          )}
+                          {log.photo && <Receipt aria-label="Con comprobante" className="ml-2 size-3.5 text-zinc-400" />}
+                        </p>
+                        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                          {formatRelative(log.date)} · {km(log.odometer)}
+                          {log.pricePerGallon !== null && ` · ${money(log.pricePerGallon)}/gal`}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums">{money(log.amount)}</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Borrar registro"
                       disabled={deleteLog.isPending}
                       onClick={async () => {
                         try {
                           await deleteLog.mutateAsync(log.id);
-                          notify("Carga borrada");
+                          notify("Registro borrado");
                         } catch (err) {
                           notify(errorMessage(err));
                         }
                       }}
-                      className="grid size-8 place-items-center rounded-full text-zinc-300 transition hover:bg-red-50 hover:text-red-500 dark:text-zinc-600 dark:hover:bg-red-950/40"
+                      className="mr-3 grid size-8 shrink-0 place-items-center rounded-full text-zinc-300 transition hover:bg-red-50 hover:text-red-500 dark:text-zinc-600 dark:hover:bg-red-950/40"
                     >
                       <Trash2 className="size-4" />
                     </button>
@@ -138,8 +159,16 @@ export function FuelPage() {
         </Button>
       )}
 
-      <Sheet open={adding} onClose={() => setAdding(false)} title="Registrar carga">
-        <FuelForm lastFuel={lastFuel} lastOdometer={home.data.lastOdometer} onDone={() => setAdding(false)} />
+      <Sheet open={sheet !== null} onClose={() => setSheet(null)} title={sheet?.log ? "Editar registro" : "Registrar combustible"}>
+        {sheet && (
+          <FuelForm
+            key={sheet.log?.id ?? "new"}
+            log={sheet.log}
+            lastFuel={lastFuel}
+            lastOdometer={home.data.lastOdometer}
+            onDone={() => setSheet(null)}
+          />
+        )}
       </Sheet>
     </div>
   );
@@ -186,22 +215,80 @@ function CostInsight({ costPerKm, gasolineRate, lpgRate }: { costPerKm: number; 
   );
 }
 
-const PRESETS = ["30", "50", "100"];
+/** What is typed in: the amount paid, as a big field like the odometer's. */
+function AmountInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="flex items-baseline gap-2 rounded-3xl bg-white px-5 py-4 ring-1 ring-zinc-200 transition focus-within:ring-2 focus-within:ring-teal dark:bg-zinc-900 dark:ring-zinc-800">
+      <span className="text-lg font-semibold text-zinc-400">S/</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        min="0"
+        placeholder="0.00"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full min-w-0 bg-transparent text-4xl font-bold tracking-tight tabular-nums outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700"
+      />
+    </div>
+  );
+}
 
-function FuelForm({ lastFuel, lastOdometer, onDone }: { lastFuel: FuelType; lastOdometer: number; onDone: () => void }) {
+/**
+ * Registers a fill-up, or corrects one when `log` is given. The order follows
+ * how it happens at the pump: the fuel, its price, how much was paid, then the
+ * odometer and the day. The receipt photo is optional.
+ */
+function FuelForm({
+  log,
+  lastFuel,
+  lastOdometer,
+  onDone,
+}: {
+  log: FuelLog | null;
+  lastFuel: FuelType;
+  lastOdometer: number;
+  onDone: () => void;
+}) {
   const notify = useNotify();
   const addLog = useAddFuelLog();
-  const [fuelType, setFuelType] = useState<FuelType>(lastFuel);
-  const [odometer, setOdometer] = useState(String(lastOdometer));
-  const [date, setDate] = useState(today());
-  const [choice, setChoice] = useState("");
-  const [fullAmount, setFullAmount] = useState("");
-  const [pricePerGallon, setPricePerGallon] = useState("");
+  const updateLog = useUpdateFuelLog();
+  // A new record starts with the fuel used last time.
+  const [fuelType, setFuelType] = useState<FuelType>(log?.fuelType ?? lastFuel);
+  const [pricePerGallon, setPricePerGallon] = useState(log?.pricePerGallon != null ? String(log.pricePerGallon) : "");
+  const [amountText, setAmountText] = useState(log ? String(log.amount) : "");
+  const [odometer, setOdometer] = useState(String(log?.odometer ?? lastOdometer));
+  const [date, setDate] = useState(log?.date ?? today());
+  const [photo, setPhoto] = useState<Blob | null>(null);
 
-  const isFull = choice === "FULL";
-  const amount = Number(isFull ? fullAmount : choice);
+  const amount = Number(amountText);
   const price = Number(pricePerGallon);
-  const canSave = amount > 0 && Number(odometer) > 0 && !addLog.isPending;
+  const pending = addLog.isPending || updateLog.isPending;
+  const canSave = amount > 0 && Number(odometer) > 0 && !pending;
+
+  async function save() {
+    const input = {
+      date,
+      odometer: Number(odometer),
+      fuelType,
+      amount,
+      // Registers are no longer marked "full"; an old one keeps what it had.
+      isFull: log?.isFull ?? false,
+      pricePerGallon: price > 0 ? price : undefined,
+    };
+    try {
+      if (log) {
+        await updateLog.mutateAsync({ id: log.id, ...input });
+        notify("Cambios guardados");
+      } else {
+        const { photoFailed } = await addLog.mutateAsync({ ...input, photo });
+        notify(photoFailed ? "Registrado, pero la foto no se pudo subir" : `Registro de ${money(amount)} guardado`);
+      }
+      onDone();
+    } catch (err) {
+      notify(errorMessage(err));
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -213,40 +300,6 @@ function FuelForm({ lastFuel, lastOdometer, onDone }: { lastFuel: FuelType; last
           { value: "LPG", label: "GLP", icon: <Flame /> },
         ]}
       />
-
-      <Field label="¿Cuánto echaste?">
-        <div className="grid grid-cols-4 gap-2">
-          {[...PRESETS, "FULL"].map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => setChoice(preset)}
-              className={cn(
-                "h-14 rounded-2xl text-base font-bold transition",
-                choice === preset
-                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                  : "bg-white ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800",
-              )}
-            >
-              {preset === "FULL" ? "Full" : `S/ ${preset}`}
-            </button>
-          ))}
-        </div>
-      </Field>
-      {isFull && (
-        <Input
-          type="number"
-          inputMode="decimal"
-          placeholder="Monto del full, ej. 87.40"
-          value={fullAmount}
-          onChange={(e) => setFullAmount(e.target.value)}
-          autoFocus
-        />
-      )}
-
-      <Field label="Kilometraje">
-        <OdometerInput value={odometer} onChange={setOdometer} />
-      </Field>
 
       <Field label="Precio por galón (opcional)">
         <Input
@@ -260,26 +313,91 @@ function FuelForm({ lastFuel, lastOdometer, onDone }: { lastFuel: FuelType; last
         />
       </Field>
 
-      <Field label="Fecha">
-        <Input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
+      <Field label="¿Cuánto echaste?">
+        <AmountInput value={amountText} onChange={setAmountText} />
       </Field>
 
-      <Button
-        size="lg"
-        variant="brand"
-        disabled={!canSave}
-        onClick={async () => {
-          try {
-            await addLog.mutateAsync({ date, odometer: Number(odometer), fuelType, amount, isFull, pricePerGallon: price > 0 ? price : undefined });
-            notify(`Carga de ${money(amount)} registrada`);
-            onDone();
-          } catch (err) {
-            notify(errorMessage(err));
-          }
-        }}
-      >
-        {addLog.isPending ? <Spinner /> : <>Guardar carga{amount > 0 && ` · ${money(amount)}`}</>}
+      <Field label="Kilometraje">
+        <OdometerInput value={odometer} onChange={setOdometer} />
+      </Field>
+
+      <DatePicker value={date} onChange={setDate} />
+
+      <div className="flex flex-col gap-1.5">
+        <span className="px-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">Foto del comprobante (opcional)</span>
+        {log ? <ReceiptPhoto log={log} /> : <LegPhotoInput value={photo} onChange={setPhoto} alt="Foto del comprobante" />}
+      </div>
+
+      <Button size="lg" variant="brand" disabled={!canSave} onClick={save}>
+        {pending ? <Spinner /> : log ? "Guardar cambios" : <>Registrar{amount > 0 && ` · ${money(amount)}`}</>}
       </Button>
     </div>
+  );
+}
+
+/** A saved record's receipt: add, view, replace or remove it right away, like a trip's photos. */
+function ReceiptPhoto({ log }: { log: FuelLog }) {
+  const notify = useNotify();
+  const setPhoto = useSetFuelPhoto();
+  const deletePhoto = useDeleteFuelPhoto();
+  const [viewing, setViewing] = useState(false);
+
+  async function upload(file: File) {
+    try {
+      await setPhoto.mutateAsync({ id: log.id, photo: await compressPhoto(file) });
+      setViewing(false);
+      notify("Foto guardada");
+    } catch (error) {
+      notify(errorMessage(error));
+    }
+  }
+
+  if (!log.photo) {
+    return (
+      <PhotoFileButton busy={setPhoto.isPending} onPick={upload}>
+        <Camera className="size-5" />
+        <span>Agregar foto</span>
+      </PhotoFileButton>
+    );
+  }
+
+  return (
+    <>
+      <PhotoThumb url={log.photo.url} alt="Foto del comprobante" onClick={() => setViewing(true)} />
+      <PhotoViewer photo={log.photo} alt="Foto del comprobante" open={viewing} onClose={() => setViewing(false)}>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/10 text-sm font-semibold text-white">
+            <Camera className="size-4" /> {setPhoto.isPending ? "Subiendo…" : "Cambiar"}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={setPhoto.isPending}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void upload(file);
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={deletePhoto.isPending}
+            onClick={async () => {
+              try {
+                await deletePhoto.mutateAsync(log.id);
+                setViewing(false);
+                notify("Foto quitada");
+              } catch (error) {
+                notify(errorMessage(error));
+              }
+            }}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white/10 text-sm font-semibold text-red-300"
+          >
+            <Trash2 className="size-4" /> Quitar
+          </button>
+        </div>
+      </PhotoViewer>
+    </>
   );
 }

@@ -218,29 +218,65 @@ export function useDeletePhoto() {
 
 export type FuelLogInput = { date: string; odometer: number; fuelType: FuelType; amount: number; isFull: boolean; pricePerGallon?: number };
 
+const fuelLogBody = (input: FuelLogInput) => ({
+  date: input.date,
+  odometer: input.odometer,
+  fuel_type: input.fuelType,
+  amount: input.amount.toFixed(2),
+  is_full: input.isFull,
+  price_per_gallon: input.pricePerGallon?.toFixed(2) ?? null,
+});
+
+/** A fuel log changed: the list, the cost per km and what home says about the fuel. */
+function fuelChanged(client: QueryClient) {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: keys.fuel }),
+    client.invalidateQueries({ queryKey: keys.home }),
+    client.invalidateQueries({ queryKey: ["usage"] }),
+  ]);
+}
+
+/** Registers a fill-up and, if there is one, uploads its receipt. The fill-up exists even if the photo fails. */
 export function useAddFuelLog() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (input: FuelLogInput) =>
-      toFuelLog(
-        await api<FuelLogDto>("/fuel-logs", {
-          method: "POST",
-          body: {
-            date: input.date,
-            odometer: input.odometer,
-            fuel_type: input.fuelType,
-            amount: input.amount.toFixed(2),
-            is_full: input.isFull,
-            price_per_gallon: input.pricePerGallon?.toFixed(2) ?? null,
-          },
-        }),
-      ),
-    onSuccess: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: keys.fuel }),
-        client.invalidateQueries({ queryKey: keys.home }),
-        client.invalidateQueries({ queryKey: ["usage"] }),
-      ]),
+    mutationFn: async ({ photo, ...input }: FuelLogInput & { photo?: Blob | null }) => {
+      const log = toFuelLog(await api<FuelLogDto>("/fuel-logs", { method: "POST", body: fuelLogBody(input) }));
+      if (!photo) return { log, photoFailed: false };
+      try {
+        await api<FuelLogDto>(`/fuel-logs/${log.id}/photo`, { method: "PUT", blob: photo });
+        return { log, photoFailed: false };
+      } catch {
+        return { log, photoFailed: true };
+      }
+    },
+    onSuccess: () => fuelChanged(client),
+  });
+}
+
+export function useUpdateFuelLog() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...input }: FuelLogInput & { id: string }) =>
+      toFuelLog(await api<FuelLogDto>(`/fuel-logs/${id}`, { method: "PUT", body: fuelLogBody(input) })),
+    onSuccess: () => fuelChanged(client),
+  });
+}
+
+export function useSetFuelPhoto() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, photo }: { id: string; photo: Blob }) =>
+      toFuelLog(await api<FuelLogDto>(`/fuel-logs/${id}/photo`, { method: "PUT", blob: photo })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.fuel }),
+  });
+}
+
+export function useDeleteFuelPhoto() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => toFuelLog(await api<FuelLogDto>(`/fuel-logs/${id}/photo`, { method: "DELETE" })),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.fuel }),
   });
 }
 
@@ -248,8 +284,7 @@ export function useDeleteFuelLog() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/fuel-logs/${id}`, { method: "DELETE" }),
-    onSuccess: () =>
-      Promise.all([client.invalidateQueries({ queryKey: keys.fuel }), client.invalidateQueries({ queryKey: keys.home })]),
+    onSuccess: () => fuelChanged(client),
   });
 }
 

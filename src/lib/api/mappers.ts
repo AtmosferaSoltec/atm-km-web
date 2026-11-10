@@ -84,6 +84,7 @@ export function toFuelLog(dto: FuelLogDto): FuelLog {
     amount: Number(dto.amount),
     isFull: dto.is_full,
     pricePerGallon: amount(dto.price_per_gallon),
+    photo: toPhoto(dto.photo),
   };
 }
 

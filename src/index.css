@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "react-day-picker/style.css";
 
 /* Atmósfera brand colors: the #1A1A1A square and the green→teal gradient from the logo. */
 @theme {
@@ -62,4 +63,38 @@
 }
 @utility animate-toast {
   animation: toast-in 220ms ease-out;
+}
+
+/* Calendar (react-day-picker) in the app's look: teal fill for the chosen day, no blue. */
+.rdp-root {
+  --rdp-accent-color: var(--color-teal);
+  --rdp-accent-background-color: color-mix(in srgb, var(--color-teal) 15%, transparent);
+  --rdp-day-height: 40px;
+  --rdp-day-width: 40px;
+  --rdp-day_button-height: 38px;
+  --rdp-day_button-width: 38px;
+  --rdp-nav_button-height: 2.25rem;
+  --rdp-nav_button-width: 2.25rem;
+  --rdp-today-color: var(--color-teal);
+  font-size: 0.9rem;
+}
+.rdp-caption_label {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.rdp-weekday {
+  font-weight: 600;
+  opacity: 0.55;
+  text-transform: capitalize;
+}
+.rdp-selected {
+  font-size: inherit;
+}
+.rdp-selected .rdp-day_button {
+  background-image: linear-gradient(135deg, var(--color-lime), var(--color-teal));
+  border-color: transparent;
+  color: var(--color-ink);
+}
+.rdp-chevron {
+  fill: currentColor;
 }

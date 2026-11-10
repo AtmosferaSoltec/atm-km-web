@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Trash2 } from "lucide-react";
 
+import { DatePicker } from "./date-picker";
 import { LegPhoto, LegPhotoInput } from "./trip-legs";
 import { Spinner } from "./states";
 import { Button, Card, Field, Input, Sheet } from "./ui";
@@ -104,9 +105,7 @@ function VoucherForm() {
           onChange={(e) => setAmount(e.target.value)}
         />
       </Field>
-      <Field label="Fecha">
-        <Input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} />
-      </Field>
+      <DatePicker value={date} onChange={setDate} />
       <LegPhotoInput value={photo} onChange={setPhoto} alt={ALT} />
       <Button
         variant="brand"
