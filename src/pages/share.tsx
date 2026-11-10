@@ -42,7 +42,7 @@ export function SharePage() {
   const profile = page.data;
   const pending = profile.pending.trips;
   const vouchers = profile.pending.vouchers;
-  const { balance, voucherAmount } = profile.pending;
+  const { balance, totalAmount, voucherAmount } = profile.pending;
   const list = tab === "pending" ? pending : profile.history;
 
   return (
@@ -87,6 +87,23 @@ export function SharePage() {
           <SharedTrip key={trip.id} trip={trip} />
         ))}
       </div>
+
+      {vouchers.length > 0 && (
+        <Card className="flex flex-col gap-2 p-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-zinc-500 dark:text-zinc-400">Total de los viajes</span>
+            <span className="font-semibold tabular-nums">{money(totalAmount)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500 dark:text-zinc-400">Vouchers de combustible ya descontados</span>
+            <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">−{money(voucherAmount)}</span>
+          </div>
+          <div className="flex justify-between border-t border-dashed border-zinc-200 pt-2 dark:border-zinc-700">
+            <span className="font-semibold">Te toca pagar</span>
+            <span className="font-bold tabular-nums">{money(Math.max(balance, 0))}</span>
+          </div>
+        </Card>
+      )}
 
       <p className="mt-auto pt-6 text-center text-xs text-zinc-400">Montos calculados con las tarifas acordadas.</p>
     </div>
