@@ -106,7 +106,9 @@ function VoucherForm() {
         />
       </Field>
       <DatePicker value={date} onChange={setDate} />
-      <LegPhotoInput value={photo} onChange={setPhoto} alt={ALT} />
+      <div className="w-28">
+        <LegPhotoInput value={photo} onChange={setPhoto} alt={ALT} />
+      </div>
       <Button
         variant="brand"
         size="lg"

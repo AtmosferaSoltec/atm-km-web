@@ -5,7 +5,7 @@ import { PageTitle } from "../components/app-shell";
 import { DatePicker } from "../components/date-picker";
 import { ErrorState, PageLoader, Spinner } from "../components/states";
 import { PhotoFileButton, PhotoThumb, PhotoViewer, LegPhotoInput } from "../components/trip-legs";
-import { Button, Card, Field, Input, OdometerInput, Segmented, Sheet } from "../components/ui";
+import { Button, Card, Field, Input, Segmented, Sheet } from "../components/ui";
 import { errorMessage } from "../lib/api/errors";
 import {
   useAddFuelLog,
@@ -35,7 +35,8 @@ export function FuelPage() {
   const home = useHome();
   const deleteLog = useDeleteFuelLog();
   // The sheet is for a new record (null log) or for correcting one.
-  const [sheet, setSheet] = useState<{ log: FuelLog | null } | null>(null);
+  // It keeps the id, not the log, so the sheet shows the saved data (a photo just uploaded) right away.
+  const [sheet, setSheet] = useState<{ logId: string | null } | null>(null);
 
   const error = summary.error ?? settings.error ?? home.error;
   if (error) {
@@ -45,6 +46,7 @@ export function FuelPage() {
 
   const rates = settings.data.rates;
   const costPerKm = summary.data.realCostPerKm;
+  const editing = sheet?.logId ? (summary.data.months.flatMap((m) => m.logs).find((l) => l.id === sheet.logId) ?? null) : null;
   const lastFuel = summary.data.months[0]?.logs[0]?.fuelType ?? "GASOLINE";
 
   return (
@@ -53,7 +55,7 @@ export function FuelPage() {
         title="Combustible"
         subtitle="Solo lo ves tú"
         action={
-          <Button variant="brand" onClick={() => setSheet({ log: null })}>
+          <Button variant="brand" onClick={() => setSheet({ logId: null })}>
             <Plus /> Registrar
           </Button>
         }
@@ -99,7 +101,7 @@ export function FuelPage() {
                     <button
                       type="button"
                       aria-label="Editar registro"
-                      onClick={() => setSheet({ log })}
+                      onClick={() => setSheet({ logId: log.id })}
                       className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-2 pl-4 text-left"
                     >
                       <span
@@ -159,11 +161,11 @@ export function FuelPage() {
         </Button>
       )}
 
-      <Sheet open={sheet !== null} onClose={() => setSheet(null)} title={sheet?.log ? "Editar registro" : "Registrar combustible"}>
-        {sheet && (
+      <Sheet open={sheet !== null} onClose={() => setSheet(null)} title={editing ? "Editar registro" : "Registrar combustible"}>
+        {sheet && (sheet.logId === null || editing) && (
           <FuelForm
-            key={sheet.log?.id ?? "new"}
-            log={sheet.log}
+            key={sheet.logId ?? "new"}
+            log={editing}
             lastFuel={lastFuel}
             lastOdometer={home.data.lastOdometer}
             onDone={() => setSheet(null)}
@@ -212,25 +214,6 @@ function CostInsight({ costPerKm, gasolineRate, lpgRate }: { costPerKm: number; 
         </p>
       )}
     </Card>
-  );
-}
-
-/** What is typed in: the amount paid, as a big field like the odometer's. */
-function AmountInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="flex items-baseline gap-2 rounded-3xl bg-white px-5 py-4 ring-1 ring-zinc-200 transition focus-within:ring-2 focus-within:ring-teal dark:bg-zinc-900 dark:ring-zinc-800">
-      <span className="text-lg font-semibold text-zinc-400">S/</span>
-      <input
-        type="number"
-        inputMode="decimal"
-        step="0.01"
-        min="0"
-        placeholder="0.00"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full min-w-0 bg-transparent text-4xl font-bold tracking-tight tabular-nums outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700"
-      />
-    </div>
   );
 }
 
@@ -301,31 +284,42 @@ function FuelForm({
         ]}
       />
 
-      <Field label="Precio por galón (opcional)">
-        <Input
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          min="0"
-          placeholder="Ej. 5.80"
-          value={pricePerGallon}
-          onChange={(e) => setPricePerGallon(e.target.value)}
-        />
-      </Field>
-
-      <Field label="¿Cuánto echaste?">
-        <AmountInput value={amountText} onChange={setAmountText} />
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Precio por galón">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            placeholder="Opcional"
+            value={pricePerGallon}
+            onChange={(e) => setPricePerGallon(e.target.value)}
+          />
+        </Field>
+        <Field label="¿Cuánto echaste?">
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            placeholder="S/ 0.00"
+            value={amountText}
+            onChange={(e) => setAmountText(e.target.value)}
+          />
+        </Field>
+      </div>
 
       <Field label="Kilometraje">
-        <OdometerInput value={odometer} onChange={setOdometer} />
+        <Input type="number" inputMode="decimal" min="0" placeholder="km" value={odometer} onChange={(e) => setOdometer(e.target.value)} />
       </Field>
 
       <DatePicker value={date} onChange={setDate} />
 
       <div className="flex flex-col gap-1.5">
         <span className="px-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">Foto del comprobante (opcional)</span>
-        {log ? <ReceiptPhoto log={log} /> : <LegPhotoInput value={photo} onChange={setPhoto} alt="Foto del comprobante" />}
+        <div className="w-28">
+          {log ? <ReceiptPhoto log={log} /> : <LegPhotoInput value={photo} onChange={setPhoto} alt="Foto del comprobante" />}
+        </div>
       </div>
 
       <Button size="lg" variant="brand" disabled={!canSave} onClick={save}>
