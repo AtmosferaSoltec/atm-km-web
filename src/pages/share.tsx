@@ -12,7 +12,7 @@ import { ApiError } from "../lib/api/client";
 import { errorMessage } from "../lib/api/errors";
 import { useSharePage } from "../lib/api/queries";
 import { formatRange } from "../lib/dates";
-import { cn, money, num, plural } from "../lib/format";
+import { cn, money, num } from "../lib/format";
 import type { Trip } from "../lib/types";
 
 type Tab = "pending" | "vouchers" | "history";
@@ -57,11 +57,30 @@ export function SharePage() {
 
       <div className="relative overflow-hidden rounded-3xl bg-zinc-900 p-6 text-white">
         <div className="bg-brand absolute -top-20 -right-10 size-48 rounded-full opacity-25 blur-3xl" />
-        <p className="text-brand relative text-5xl font-bold tracking-tight tabular-nums">{money(Math.max(balance, 0))}</p>
-        <p className="relative mt-1 text-sm text-zinc-400">
-          {pending.length > 0 ? `${plural(pending.length, "viaje", "viajes")} por pagar` : "Estás al día 🙌"}
-          {vouchers.length > 0 && ` – ${money(voucherAmount)} en vouchers descontados`}
-        </p>
+        {pending.length > 0 ? (
+          <dl className="relative flex flex-col gap-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-zinc-400">Total de kilómetros</dt>
+              <dd className="font-semibold tabular-nums">{num(totalKm)} km</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-zinc-400">Total en soles</dt>
+              <dd className="font-semibold tabular-nums">{money(totalAmount)}</dd>
+            </div>
+            {vouchers.length > 0 && (
+              <div className="flex justify-between gap-3">
+                <dt className="text-zinc-400">Vouchers de combustible</dt>
+                <dd className="font-semibold text-emerald-400 tabular-nums">−{money(voucherAmount)}</dd>
+              </div>
+            )}
+            <div className="mt-2 flex items-end justify-between gap-3 border-t border-dashed border-zinc-700 pt-4">
+              <dt className="text-base font-medium text-zinc-300">Total a pagar</dt>
+              <dd className="text-brand text-5xl font-bold tracking-tight tabular-nums">{money(Math.max(balance, 0))}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="relative text-center text-lg font-semibold">Estás al día 🙌</p>
+        )}
       </div>
 
       <Chips
@@ -88,31 +107,6 @@ export function SharePage() {
           <SharedTrip key={trip.id} trip={trip} />
         ))}
       </div>
-
-      {pending.length > 0 && (
-        <Card className="flex flex-col gap-2 p-4 text-sm">
-          <div className="flex justify-between">
-            <span className="text-zinc-500 dark:text-zinc-400">Kilómetros recorridos</span>
-            <span className="font-semibold tabular-nums">{num(totalKm)} km</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500 dark:text-zinc-400">Total de los viajes</span>
-            <span className="font-semibold tabular-nums">{money(totalAmount)}</span>
-          </div>
-          {vouchers.length > 0 && (
-            <>
-              <div className="flex justify-between">
-                <span className="text-zinc-500 dark:text-zinc-400">Vouchers de combustible ya descontados</span>
-                <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">−{money(voucherAmount)}</span>
-              </div>
-              <div className="flex justify-between border-t border-dashed border-zinc-200 pt-2 dark:border-zinc-700">
-                <span className="font-semibold">Te toca pagar</span>
-                <span className="font-bold tabular-nums">{money(Math.max(balance, 0))}</span>
-              </div>
-            </>
-          )}
-        </Card>
-      )}
 
       <p className="mt-auto pt-6 text-center text-xs text-zinc-400">Montos calculados con las tarifas acordadas.</p>
     </div>
