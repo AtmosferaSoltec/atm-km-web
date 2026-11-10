@@ -6,7 +6,7 @@ import { PageTitle } from "../components/app-shell";
 import { ErrorState, PageLoader, Spinner } from "../components/states";
 import { Button, Card, SectionTitle, Sheet } from "../components/ui";
 import { errorMessage } from "../lib/api/errors";
-import { useRotateShareToken, useSettings, useUpdateProfile, useUpdateRates } from "../lib/api/queries";
+import { useRotateShareToken, useSettings, useUpdateRates } from "../lib/api/queries";
 import { useAuth, useUser } from "../lib/auth";
 import { money } from "../lib/format";
 import { ROUTES } from "../lib/routes";
@@ -27,7 +27,6 @@ export function SettingsPage() {
     <div className="flex flex-col gap-6">
       <PageTitle title="Ajustes" />
       <RatesSection settings={settings.data} />
-      <ProfileSection settings={settings.data} />
       <ShareSection settings={settings.data} />
       <AccountSection />
     </div>
@@ -97,56 +96,6 @@ function RatesSection({ settings }: { settings: Settings }) {
   );
 }
 
-function ProfileSection({ settings }: { settings: Settings }) {
-  const notify = useNotify();
-  const updateProfile = useUpdateProfile();
-  const [carName, setCarName] = useState(settings.carName);
-  const [borrowerName, setBorrowerName] = useState(settings.borrowerName);
-  const dirty = carName.trim() !== settings.carName || borrowerName.trim() !== settings.borrowerName;
-  const valid = carName.trim() !== "" && borrowerName.trim() !== "";
-
-  const fields = [
-    { label: "Auto", value: carName, set: setCarName, max: 60, placeholder: "Ej. Toyota Yaris" },
-    { label: "Se lo prestas a", value: borrowerName, set: setBorrowerName, max: 40, placeholder: "Ej. Carlos" },
-  ];
-
-  return (
-    <section className="flex flex-col gap-2">
-      <SectionTitle>Auto</SectionTitle>
-      <Card className="divide-y divide-zinc-100 overflow-hidden dark:divide-zinc-800">
-        {fields.map((field) => (
-          <label key={field.label} className="flex items-center justify-between gap-3 px-4 py-3">
-            <span className="shrink-0 text-sm font-medium">{field.label}</span>
-            <input
-              value={field.value}
-              maxLength={field.max}
-              placeholder={field.placeholder}
-              onChange={(e) => field.set(e.target.value)}
-              className="min-w-0 flex-1 rounded-xl bg-zinc-100 px-3 py-2 text-right text-sm font-semibold outline-none focus:ring-2 focus:ring-teal dark:bg-zinc-800"
-            />
-          </label>
-        ))}
-      </Card>
-      {dirty && (
-        <Button
-          variant="brand"
-          disabled={!valid || updateProfile.isPending}
-          onClick={async () => {
-            try {
-              await updateProfile.mutateAsync({ carName: carName.trim(), borrowerName: borrowerName.trim() });
-              notify("Datos guardados");
-            } catch (error) {
-              notify(errorMessage(error));
-            }
-          }}
-        >
-          {updateProfile.isPending ? <Spinner /> : "Guardar"}
-        </Button>
-      )}
-    </section>
-  );
-}
-
 function ShareSection({ settings }: { settings: Settings }) {
   const notify = useNotify();
   const rotate = useRotateShareToken();
@@ -155,7 +104,7 @@ function ShareSection({ settings }: { settings: Settings }) {
 
   return (
     <section className="flex flex-col gap-2">
-      <SectionTitle>Enlace para {settings.borrowerName}</SectionTitle>
+      <SectionTitle>Enlace para tu familiar</SectionTitle>
       <Card className="p-4">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Ve lo que te debe y sus viajes, sin contraseña. No muestra tu combustible.
@@ -179,7 +128,7 @@ function ShareSection({ settings }: { settings: Settings }) {
             to={ROUTES.share(settings.shareToken)}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white text-sm font-semibold ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800"
           >
-            <ExternalLink className="size-4" /> Ver como {settings.borrowerName}
+            <ExternalLink className="size-4" /> Ver como tu familiar
           </Link>
         </div>
         <button

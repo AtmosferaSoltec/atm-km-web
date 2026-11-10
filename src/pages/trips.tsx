@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 import { PageTitle } from "../components/app-shell";
 import { ErrorState, PageLoader, Spinner } from "../components/states";
@@ -149,6 +149,11 @@ function TripDetail({ trip }: { trip: Trip }) {
           <Button size="lg" disabled={busy} onClick={() => run(() => pay.mutateAsync(trip.id), "Marcado como pagado")}>
             {pay.isPending ? <Spinner /> : `Marcar como pagado · ${money(trip.totalAmount ?? 0)}`}
           </Button>
+        )}
+        {trip.status === "PENDING" && (
+          <ButtonLink to={ROUTES.returnTrip(trip.id)} variant="secondary">
+            <Pencil /> Corregir devolución
+          </ButtonLink>
         )}
         {trip.status === "PAID" && (
           <Button

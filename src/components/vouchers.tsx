@@ -45,12 +45,10 @@ export function VouchersSheet({
   open,
   onClose,
   vouchers,
-  borrowerName,
 }: {
   open: boolean;
   onClose: () => void;
   vouchers: Voucher[];
-  borrowerName: string;
 }) {
   const notify = useNotify();
   const remove = useDeleteVoucher();
@@ -58,7 +56,7 @@ export function VouchersSheet({
   return (
     <Sheet open={open} onClose={onClose} title="Vouchers de combustible">
       <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-        Lo que {borrowerName} pagó de gasolina mientras usaba el auto. Se descuenta de lo que debe cuando le cobras.
+        Lo que tu familiar pagó de gasolina mientras usaba el auto. Se descuenta de lo que debe cuando le cobras.
       </p>
       <VoucherForm />
       {vouchers.length > 0 && (

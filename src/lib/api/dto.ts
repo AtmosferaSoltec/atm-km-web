@@ -24,8 +24,6 @@ export type TripDto = {
 };
 
 export type SettingsDto = {
-  car_name: string;
-  borrower_name: string;
   rates: { gasoline_rate: string; lpg_rate: string; wear_rate: string };
   share_token: string;
 };
@@ -84,8 +82,6 @@ export type UsageDto = {
 
 export type ShareDto = {
   owner_name: string;
-  car_name: string;
-  borrower_name: string;
   pending: PendingDto;
   history: TripDto[];
 };

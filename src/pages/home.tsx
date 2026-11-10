@@ -58,7 +58,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <UsageCard borrowerName={settings.data.borrowerName} />
+      <UsageCard />
 
       <section className="flex flex-col gap-2">
         <SectionTitle
@@ -93,7 +93,7 @@ export function HomePage() {
  */
 function CarStatus({ home, settings }: { home: Home; settings: Settings }) {
   const { openTrip, lastOdometer } = home;
-  const { rates, borrowerName } = settings;
+  const { rates } = settings;
 
   if (!openTrip) {
     return (
@@ -125,7 +125,7 @@ function CarStatus({ home, settings }: { home: Home; settings: Settings }) {
       <div className="relative">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-lime">
           <span className="size-1.5 animate-pulse rounded-full bg-lime" />
-          Prestado a {borrowerName}
+          Prestado
         </span>
         <p className="mt-3 text-3xl font-bold tracking-tight">
           {daysOut === 0 ? "Desde hoy" : `Hace ${plural(daysOut, "día", "días")}`}
@@ -151,7 +151,7 @@ function PendingCard({ pending, settings }: { pending: Pending; settings: Settin
   const [confirming, setConfirming] = useState(false);
   const [managingVouchers, setManagingVouchers] = useState(false);
   const { trips, vouchers, totalAmount, voucherAmount, balance } = pending;
-  const { borrowerName, shareToken } = settings;
+  const { shareToken } = settings;
 
   if (trips.length === 0 && vouchers.length === 0) {
     return (
@@ -162,7 +162,7 @@ function PendingCard({ pending, settings }: { pending: Pending; settings: Settin
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">Todo cobrado</p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">{borrowerName} no te debe nada.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Tu familiar no te debe nada.</p>
           </div>
           <Button variant="secondary" size="sm" onClick={() => setManagingVouchers(true)}>
             <Receipt /> Voucher
@@ -172,7 +172,6 @@ function PendingCard({ pending, settings }: { pending: Pending; settings: Settin
           open={managingVouchers}
           onClose={() => setManagingVouchers(false)}
           vouchers={vouchers}
-          borrowerName={borrowerName}
         />
       </>
     );
@@ -193,7 +192,7 @@ function PendingCard({ pending, settings }: { pending: Pending; settings: Settin
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            {balance < 0 ? `A favor de ${borrowerName}` : `Por cobrar a ${borrowerName}`}
+            {balance < 0 ? "A favor de tu familiar" : "Por cobrar"}
           </p>
           <p className="text-4xl font-bold tracking-tight tabular-nums">{money(Math.abs(balance))}</p>
           <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -224,7 +223,6 @@ function PendingCard({ pending, settings }: { pending: Pending; settings: Settin
         open={managingVouchers}
         onClose={() => setManagingVouchers(false)}
         vouchers={vouchers}
-        borrowerName={borrowerName}
       />
 
       {/* Mounted only while open, so every opening starts with everything ticked. */}

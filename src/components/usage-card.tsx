@@ -12,7 +12,7 @@ const WEEKS = 8;
  * Who drove the car: you (the odometer moved while it was home) or the
  * borrower (the trips). Private; the share page never shows it.
  */
-export function UsageCard({ borrowerName }: { borrowerName: string }) {
+export function UsageCard() {
   const usage = useUsage(WEEKS);
   const [open, setOpen] = useState(false);
 
@@ -26,9 +26,9 @@ export function UsageCard({ borrowerName }: { borrowerName: string }) {
   return (
     <Card className="p-5">
       <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">¿Quién usó más el auto? · {WEEKS} semanas</p>
-      <Versus ownerKm={ownerKm} borrowerKm={borrowerKm} ownerName="Tú" borrowerName={borrowerName} large />
+      <Versus ownerKm={ownerKm} borrowerKm={borrowerKm} ownerName="Tú" borrowerName="Familiar" large />
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-        Tú hiciste el {ownerSharePct}% de los km. Esta semana: tú {km(thisWeek.ownerKm)} · {borrowerName}{" "}
+        Tú hiciste el {ownerSharePct}% de los km. Esta semana: tú {km(thisWeek.ownerKm)} · Familiar{" "}
         {km(thisWeek.borrowerKm)}.
       </p>
 
@@ -45,7 +45,7 @@ export function UsageCard({ borrowerName }: { borrowerName: string }) {
           {weeks.map((week) => (
             <div key={week.start}>
               <p className="mb-1 text-xs font-semibold">{weekLabel(week.start)}</p>
-              <Versus ownerKm={week.ownerKm} borrowerKm={week.borrowerKm} ownerName="Tú" borrowerName={borrowerName} />
+              <Versus ownerKm={week.ownerKm} borrowerKm={week.borrowerKm} ownerName="Tú" borrowerName="Familiar" />
             </div>
           ))}
         </div>

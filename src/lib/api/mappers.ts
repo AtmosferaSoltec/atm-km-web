@@ -33,8 +33,6 @@ export function toTrip(dto: TripDto): Trip {
 
 export function toSettings(dto: SettingsDto): Settings {
   return {
-    carName: dto.car_name,
-    borrowerName: dto.borrower_name,
     shareToken: dto.share_token,
     rates: {
       gasolineRate: Number(dto.rates.gasoline_rate),
@@ -110,8 +108,6 @@ export function toUsage(dto: UsageDto): Usage {
 export function toSharePage(dto: ShareDto): SharePage {
   return {
     ownerName: dto.owner_name,
-    carName: dto.car_name,
-    borrowerName: dto.borrower_name,
     pending: toPending(dto.pending),
     history: dto.history.map(toTrip),
   };

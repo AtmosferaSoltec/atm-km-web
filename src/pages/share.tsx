@@ -3,8 +3,8 @@ import { useParams } from "react-router";
 import { ChevronDown } from "lucide-react";
 
 import { KmMark } from "../components/km-mark";
-import { Receipt, StatusBadge, TripIcon, tripReceipt, tripSummary } from "../components/trip-bits";
-import { TripLegsView } from "../components/trip-legs-view";
+import { StatusBadge, TripIcon, tripSummary } from "../components/trip-bits";
+import { LegPhoto } from "../components/trip-legs";
 import { VoucherCard } from "../components/vouchers";
 import { PageLoader } from "../components/states";
 import { Card, Chips } from "../components/ui";
@@ -12,7 +12,7 @@ import { ApiError } from "../lib/api/client";
 import { errorMessage } from "../lib/api/errors";
 import { useSharePage } from "../lib/api/queries";
 import { formatRange } from "../lib/dates";
-import { cn, money, plural } from "../lib/format";
+import { cn, money, num, plural } from "../lib/format";
 import type { Trip } from "../lib/types";
 
 type Tab = "pending" | "vouchers" | "history";
@@ -42,7 +42,7 @@ export function SharePage() {
   const profile = page.data;
   const pending = profile.pending.trips;
   const vouchers = profile.pending.vouchers;
-  const { balance, totalAmount, voucherAmount } = profile.pending;
+  const { balance, voucherAmount } = profile.pending;
   const list = tab === "pending" ? pending : profile.history;
 
   return (
@@ -51,17 +51,15 @@ export function SharePage() {
         <KmMark size={34} />
         <div>
           <p className="text-sm leading-tight font-bold">Auto de {profile.ownerName}</p>
-          <p className="text-xs leading-tight text-zinc-500">{profile.carName}</p>
         </div>
       </div>
 
       <div className="relative overflow-hidden rounded-3xl bg-zinc-900 p-6 text-white">
         <div className="bg-brand absolute -top-20 -right-10 size-48 rounded-full opacity-25 blur-3xl" />
-        <p className="relative text-sm text-zinc-400">Hola {profile.borrowerName}, tienes pendiente</p>
         <p className="text-brand relative text-5xl font-bold tracking-tight tabular-nums">{money(Math.max(balance, 0))}</p>
         <p className="relative mt-1 text-sm text-zinc-400">
           {pending.length > 0 ? `${plural(pending.length, "viaje", "viajes")} por pagar` : "Estás al día 🙌"}
-          {vouchers.length > 0 && ` · ya descontados ${money(voucherAmount)} de combustible (de ${money(totalAmount)})`}
+          {vouchers.length > 0 && ` – ${money(voucherAmount)} en vouchers descontados`}
         </p>
       </div>
 
@@ -76,7 +74,7 @@ export function SharePage() {
       />
 
       {tab === "vouchers" && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {vouchers.map((voucher) => (
             <VoucherCard key={voucher.id} voucher={voucher} />
           ))}
@@ -118,10 +116,41 @@ function SharedTrip({ trip }: { trip: Trip }) {
       </button>
       {open && (
         <div className="flex flex-col gap-3 bg-zinc-100 p-3 dark:bg-zinc-950">
-          <TripLegsView trip={trip} />
-          <Receipt title="Total" data={tripReceipt(trip)} />
+          <SharedTripDetail trip={trip} />
         </div>
       )}
     </Card>
+  );
+}
+
+/** The borrower only needs the math: km × rate. Photos show up only if there are any. */
+function SharedTripDetail({ trip }: { trip: Trip }) {
+  const rate = (trip.fuelRate ?? 0) + (trip.wearRate ?? 0);
+  const photos = [
+    { label: "Salida", photo: trip.photos.start },
+    { label: "Devolución", photo: trip.photos.end },
+  ].filter((p) => p.photo);
+
+  return (
+    <>
+      {trip.distanceKm != null && trip.totalAmount != null && (
+        <div className="flex items-baseline justify-between gap-3 px-1 text-sm">
+          <span className="text-zinc-500 dark:text-zinc-400">
+            {num(trip.distanceKm)} km × {money(rate)}
+          </span>
+          <span className="font-bold tabular-nums">{money(trip.totalAmount)}</span>
+        </div>
+      )}
+      {photos.length > 0 && (
+        <div className="flex gap-2">
+          {photos.map(({ label, photo }) => (
+            <div key={label} className="flex w-24 flex-col gap-1">
+              <LegPhoto photo={photo} />
+              <span className="pl-1 text-[11px] text-zinc-500 dark:text-zinc-400">{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

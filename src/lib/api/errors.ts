@@ -15,8 +15,6 @@ const FIELD_LABELS: Record<string, string> = {
   gasoline_rate: "La tarifa de gasolina",
   lpg_rate: "La tarifa de GLP",
   wear_rate: "La tarifa de desgaste",
-  car_name: "El nombre del auto",
-  borrower_name: "El nombre de quien lo usa",
 };
 
 const CODE_TEXT: Record<string, string> = {

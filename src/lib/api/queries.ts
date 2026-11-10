@@ -309,15 +309,6 @@ export function useUpdateRates() {
   );
 }
 
-export function useUpdateProfile() {
-  return useSettingsMutation((input: { carName: string; borrowerName: string }) =>
-    api<SettingsDto>("/settings/profile", {
-      method: "PUT",
-      body: { car_name: input.carName, borrower_name: input.borrowerName },
-    }),
-  );
-}
-
 export function useRotateShareToken() {
   return useSettingsMutation(() => api<SettingsDto>("/settings/share-token", { method: "POST" }));
 }

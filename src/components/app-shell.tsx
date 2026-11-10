@@ -5,7 +5,6 @@ import { ChevronLeft, Fuel, History, House, Settings, type LucideIcon } from "lu
 import { KmMark } from "./km-mark";
 import { cn } from "../lib/format";
 import { ROUTES } from "../lib/routes";
-import { useSettings } from "../lib/api/queries";
 
 const NAV: { to: string; label: string; icon: LucideIcon }[] = [
   { to: ROUTES.home, label: "Inicio", icon: House },
@@ -23,7 +22,6 @@ const FULLSCREEN = [/^\/lend$/, /^\/trips\/[^/]+\/return$/];
  * up the same sections move into the header and the content gets a bit wider.
  */
 export function AppShell() {
-  const settings = useSettings();
   const { pathname } = useLocation();
   const fullscreen = FULLSCREEN.some((re) => re.test(pathname));
 
@@ -34,7 +32,7 @@ export function AppShell() {
           <Link to={ROUTES.home} className="flex min-w-0 items-center gap-2.5">
             <KmMark size={30} />
             <span className="min-w-0">
-              <span className="block truncate text-sm leading-tight font-bold">{settings.data?.carName ?? "KM"}</span>
+              <span className="block truncate text-sm leading-tight font-bold">KM</span>
               <span className="block text-[11px] leading-tight text-zinc-500">Préstamo del auto</span>
             </span>
           </Link>

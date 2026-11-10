@@ -14,6 +14,7 @@ import {
   LegKm,
   LegKmInput,
   LegPhoto,
+  LegPhotoEditor,
   LegPhotoInput,
   LegsGrid,
 } from "../components/trip-legs";
@@ -33,17 +34,31 @@ const FUEL_OPTIONS = [
 ];
 
 /** State for the end leg, shared by "Recibir auto" and by lending a car that is already back. */
-function useEndLeg(lastFuel: FuelType | null) {
-  const [endKm, setEndKm] = useState("");
-  const [returnDate, setReturnDate] = useState(today());
-  const [fuelType, setFuelType] = useState<FuelType>(lastFuel ?? "GASOLINE");
+function useEndLeg(lastFuel: FuelType | null, saved?: Trip) {
+  // When correcting a return, the fields start with what was registered.
+  const [endKm, setEndKm] = useState(saved?.endKm != null ? String(saved.endKm) : "");
+  const [returnDate, setReturnDate] = useState(saved?.returnDate ?? today());
+  const [fuelType, setFuelType] = useState<FuelType>(saved?.fuelType ?? lastFuel ?? "GASOLINE");
   const [endPhoto, setEndPhoto] = useState<Blob | null>(null);
   return { endKm, setEndKm, returnDate, setReturnDate, fuelType, setFuelType, endPhoto, setEndPhoto };
 }
 
 type EndLeg = ReturnType<typeof useEndLeg>;
 
-function EndLegFields({ leg, startKm, startDate, autoFocus }: { leg: EndLeg; startKm: number; startDate: string; autoFocus?: boolean }) {
+function EndLegFields({
+  leg,
+  startKm,
+  startDate,
+  autoFocus,
+  saved,
+}: {
+  leg: EndLeg;
+  startKm: number;
+  startDate: string;
+  autoFocus?: boolean;
+  /** A trip already returned: its photo is replaced on the spot instead of picked for later. */
+  saved?: Trip;
+}) {
   const typed = leg.endKm.trim() !== "";
   return (
     <>
@@ -55,7 +70,11 @@ function EndLegFields({ leg, startKm, startDate, autoFocus }: { leg: EndLeg; sta
         autoFocus={autoFocus}
       />
       <LegDateInput value={leg.returnDate} onChange={leg.setReturnDate} min={startDate} />
-      <LegPhotoInput value={leg.endPhoto} onChange={leg.setEndPhoto} />
+      {saved ? (
+        <LegPhotoEditor tripId={saved.id} leg="end" photo={saved.photos.end} />
+      ) : (
+        <LegPhotoInput value={leg.endPhoto} onChange={leg.setEndPhoto} />
+      )}
     </>
   );
 }
@@ -153,7 +172,7 @@ function LendForm({ home, settings }: { home: Home; settings: Settings }) {
         ["end", alreadyBack ? leg.endPhoto : null],
       ]);
       if (alreadyBack) notify(photosOk ? "Viaje registrado" : PHOTO_FAILED);
-      else notify(photosOk ? `Auto prestado a ${settings.borrowerName}` : PHOTO_FAILED);
+      else notify(photosOk ? "Auto prestado" : PHOTO_FAILED);
       navigate(ROUTES.home, { replace: true });
     } catch (error) {
       notify(errorMessage(error));
@@ -163,7 +182,7 @@ function LendForm({ home, settings }: { home: Home; settings: Settings }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageTitle title="Prestar auto" subtitle={`A ${settings.borrowerName}`} back={ROUTES.home} />
+      <PageTitle title="Prestar auto" back={ROUTES.home} />
 
       <LegsGrid distanceKm={alreadyBack ? distanceOf(leg, start) : null}>
         <LegCard kind="start">
@@ -211,7 +230,9 @@ export function ReturnTripPage() {
   const error = trip.error ?? home.error ?? settings.error;
   if (error) return <ErrorState error={error} onRetry={() => void Promise.all([trip.refetch(), home.refetch(), settings.refetch()])} />;
   if (!trip.data || !home.data || !settings.data) return <PageLoader />;
-  if (trip.data.status !== "IN_PROGRESS" && !formShown.current) return <Navigate to={ROUTES.trip(trip.data.id)} replace />;
+  // IN_PROGRESS: receiving the car. PENDING: correcting a return not yet paid.
+  const open = trip.data.status === "IN_PROGRESS" || trip.data.status === "PENDING";
+  if (!open && !formShown.current) return <Navigate to={ROUTES.trip(trip.data.id)} replace />;
   formShown.current = true;
   return <ReturnForm trip={trip.data} lastFuel={home.data.lastFuelType} settings={settings.data} />;
 }
@@ -222,8 +243,16 @@ function ReturnForm({ trip, lastFuel, settings }: { trip: Trip; lastFuel: FuelTy
   const notify = useNotify();
   const receive = useReceive();
   const queryClient = useQueryClient();
-  const leg = useEndLeg(lastFuel);
+  // Decided once: saving a reception turns the trip into PENDING, which must not flip the form to "edit".
+  const [correcting] = useState(trip.status === "PENDING");
+  const leg = useEndLeg(lastFuel, correcting ? trip : undefined);
   const [saving, setSaving] = useState(false);
+
+  // A correction keeps the rates the trip was charged with (the API does the same), unless the fuel changes.
+  const keepsRates = correcting && leg.fuelType === trip.fuelType && trip.fuelRate != null && trip.wearRate != null;
+  const billingRates: Rates = keepsRates
+    ? { gasolineRate: trip.fuelRate!, lpgRate: trip.fuelRate!, wearRate: trip.wearRate! }
+    : settings.rates;
 
   const canSave = Number(leg.endKm) > trip.startKm && leg.returnDate >= trip.startDate && !saving;
 
@@ -231,8 +260,8 @@ function ReturnForm({ trip, lastFuel, settings }: { trip: Trip; lastFuel: FuelTy
     setSaving(true);
     try {
       await receive.mutateAsync({ tripId: trip.id, returnDate: leg.returnDate, endKm: Number(leg.endKm), fuelType: leg.fuelType });
-      const photosOk = await uploadPhotos(queryClient, trip.id, [["end", leg.endPhoto]]);
-      notify(photosOk ? "Auto recibido · queda por cobrar" : PHOTO_FAILED);
+      const photosOk = correcting ? true : await uploadPhotos(queryClient, trip.id, [["end", leg.endPhoto]]);
+      notify(correcting ? "Devolución corregida" : photosOk ? "Auto recibido · queda por cobrar" : PHOTO_FAILED);
       // Back to wherever the user came from (home or the trip's detail).
       if (location.key === "default") navigate(ROUTES.home, { replace: true });
       else navigate(-1);
@@ -244,7 +273,10 @@ function ReturnForm({ trip, lastFuel, settings }: { trip: Trip; lastFuel: FuelTy
 
   return (
     <div className="flex flex-col gap-5">
-      <PageTitle title="Recibir auto" subtitle={`De ${settings.borrowerName}`} back={ROUTES.home} />
+      <PageTitle
+        title={correcting ? "Corregir devolución" : "Recibir auto"}
+        back={correcting ? ROUTES.trip(trip.id) : ROUTES.home}
+      />
 
       <LegsGrid distanceKm={distanceOf(leg, trip.startKm)}>
         <LegCard kind="start">
@@ -253,22 +285,24 @@ function ReturnForm({ trip, lastFuel, settings }: { trip: Trip; lastFuel: FuelTy
           <LegPhoto photo={trip.photos.start} />
         </LegCard>
         <LegCard kind="end">
-          <EndLegFields leg={leg} startKm={trip.startKm} startDate={trip.startDate} autoFocus />
+          <EndLegFields leg={leg} startKm={trip.startKm} startDate={trip.startDate} autoFocus saved={correcting ? trip : undefined} />
         </LegCard>
       </LegsGrid>
 
-      <Settlement leg={leg} startKm={trip.startKm} rates={settings.rates} />
+      <Settlement leg={leg} startKm={trip.startKm} rates={billingRates} />
 
-      <Link
-        to={ROUTES.trip(trip.id)}
-        className="self-center py-2 text-sm font-semibold text-zinc-500 underline-offset-2 hover:underline"
-      >
-        ¿No se usó? Cancelar préstamo
-      </Link>
+      {!correcting && (
+        <Link
+          to={ROUTES.trip(trip.id)}
+          className="self-center py-2 text-sm font-semibold text-zinc-500 underline-offset-2 hover:underline"
+        >
+          ¿No se usó? Cancelar préstamo
+        </Link>
+      )}
 
       <StickyAction>
         <Button size="lg" variant="brand" className="w-full" disabled={!canSave} onClick={save}>
-          {saving ? <Spinner /> : "Recibir auto"}
+          {saving ? <Spinner /> : correcting ? "Guardar cambios" : "Recibir auto"}
         </Button>
       </StickyAction>
     </div>

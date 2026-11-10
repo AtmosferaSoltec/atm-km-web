@@ -54,8 +54,6 @@ export type FuelLog = {
 };
 
 export type Settings = {
-  carName: string;
-  borrowerName: string;
   shareToken: string;
   rates: Rates;
 };
@@ -120,8 +118,6 @@ export type Usage = {
 
 export type SharePage = {
   ownerName: string;
-  carName: string;
-  borrowerName: string;
   pending: Pending;
   history: Trip[];
 };
