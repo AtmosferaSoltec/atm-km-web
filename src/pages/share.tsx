@@ -43,6 +43,7 @@ export function SharePage() {
   const pending = profile.pending.trips;
   const vouchers = profile.pending.vouchers;
   const { balance, totalAmount, voucherAmount } = profile.pending;
+  const totalKm = pending.reduce((sum, trip) => sum + (trip.distanceKm ?? 0), 0);
   const list = tab === "pending" ? pending : profile.history;
 
   return (
@@ -88,20 +89,28 @@ export function SharePage() {
         ))}
       </div>
 
-      {vouchers.length > 0 && (
+      {pending.length > 0 && (
         <Card className="flex flex-col gap-2 p-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-zinc-500 dark:text-zinc-400">Kilómetros recorridos</span>
+            <span className="font-semibold tabular-nums">{num(totalKm)} km</span>
+          </div>
           <div className="flex justify-between">
             <span className="text-zinc-500 dark:text-zinc-400">Total de los viajes</span>
             <span className="font-semibold tabular-nums">{money(totalAmount)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500 dark:text-zinc-400">Vouchers de combustible ya descontados</span>
-            <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">−{money(voucherAmount)}</span>
-          </div>
-          <div className="flex justify-between border-t border-dashed border-zinc-200 pt-2 dark:border-zinc-700">
-            <span className="font-semibold">Te toca pagar</span>
-            <span className="font-bold tabular-nums">{money(Math.max(balance, 0))}</span>
-          </div>
+          {vouchers.length > 0 && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-zinc-500 dark:text-zinc-400">Vouchers de combustible ya descontados</span>
+                <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">−{money(voucherAmount)}</span>
+              </div>
+              <div className="flex justify-between border-t border-dashed border-zinc-200 pt-2 dark:border-zinc-700">
+                <span className="font-semibold">Te toca pagar</span>
+                <span className="font-bold tabular-nums">{money(Math.max(balance, 0))}</span>
+              </div>
+            </>
+          )}
         </Card>
       )}
 
